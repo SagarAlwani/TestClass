@@ -1,0 +1,116 @@
+public class MetaDataUtility {
+    @AuraEnabled
+    //To create Custom Object
+    public static void createCustomObject(String objectAPIName, String objectLabel) {
+        
+        MetadataService.MetadataPort service = new MetadataService.MetadataPort();  
+        service.SessionHeader = new MetadataService.SessionHeader_element();
+        if(Test.isRunningTest()) { 
+           service.SessionHeader.sessionId = UserInfo.getSessionId();
+        } else {
+            service.SessionHeader.sessionId = fetchUserSessionId();
+        }
+
+        List<MetadataService.Metadata> fields = new List<MetadataService.Metadata>();
+        MetadataService.CustomObject customObject = new MetadataService.CustomObject();
+        customObject.fullName = objectAPIName;
+        customObject.label = objectLabel;
+        customObject.pluralLabel = objectLabel+'s';
+        customObject.nameField = new MetadataService.CustomField();
+        customObject.nameField.type_x = 'Text';
+        customObject.nameField.label = 'Custom Created field Primary';
+        customObject.deploymentStatus = 'Deployed';
+        customObject.sharingModel = 'ReadWrite';
+        fields.add(customObject);
+        
+        MetadataService.SaveResult[] results = service.createMetadata(fields);
+		handleSaveResults(results[0]);
+    }
+    
+    @AuraEnabled
+    //Create a custom field
+    public static void createField(String objectAPIName, String customFieldAPIName, String type, String fieldLabel) {
+        
+        MetadataService.MetadataPort service = new MetadataService.MetadataPort();  
+        service.SessionHeader = new MetadataService.SessionHeader_element();
+        if(Test.isRunningTest()) { 
+           service.SessionHeader.sessionId = UserInfo.getSessionId();
+        } else {
+            service.SessionHeader.sessionId = fetchUserSessionId();
+        }
+        
+        List<MetadataService.Metadata> fields = new List<MetadataService.Metadata>();
+        MetadataService.CustomField customField = new MetadataService.CustomField();
+        customField.fullName = objectAPIName+'.'+customFieldAPIName;
+        customField.label = fieldLabel;
+        customField.defaultvalue = 'false';
+        customField.type_x = type;
+        fields.add(customField);
+        
+        MetadataService.SaveResult[] results = service.createMetadata(fields);
+        handleSaveResults(results[0]);
+    }
+    
+    @AuraEnabled
+    //Create a custom label
+    public static void createLabel(String description, String name, String value, Boolean protect) {
+        
+        MetadataService.MetadataPort service = new MetadataService.MetadataPort();  
+        service.SessionHeader = new MetadataService.SessionHeader_element();
+        if(Test.isRunningTest()) { 
+           service.SessionHeader.sessionId = UserInfo.getSessionId();
+        } else {
+            service.SessionHeader.sessionId = fetchUserSessionId();
+        }
+        
+        List<MetadataService.Metadata> labels = new List<MetadataService.Metadata>();
+        MetadataService.CustomLabel customLabel = new MetadataService.CustomLabel();
+        customLabel.fullName = name;
+        customLabel.shortDescription = description;
+        customLabel.value = value;
+        customLabel.language = 'en_US';
+        customLabel.protected_x = protect;
+        labels.add(customLabel);
+        
+        MetadataService.SaveResult[] results = service.createMetadata(labels);
+        handleSaveResults(results[0]);
+    }
+    
+    public static void handleSaveResults(MetadataService.SaveResult saveResult)
+    {
+        // Nothing to see?
+        if(saveResult==null || saveResult.success)
+            return;
+        // Construct error message and throw an exception
+        if(saveResult.errors!=null)
+        {
+            List<String> messages = new List<String>();
+            messages.add(
+                (saveResult.errors.size()==1 ? 'Error in' : 'Errors in') + saveResult.fullName + '.');
+            for(MetadataService.Error error : saveResult.errors)
+                messages.add(
+                    error.message + ' (' + error.statusCode + ').' +
+                    ( error.fields!=null && error.fields.size()>0 ?
+                        ' Fields ' + String.join(error.fields, ',') + '.' : '' ) );
+            if(messages.size()>0)
+                throw new MetadataServiceExamplesException(String.join(messages, ' '));
+        }
+        if(!saveResult.success)
+            throw new MetadataServiceExamplesException('Request failed with no specified error.');
+    }
+    
+    public static String fetchUserSessionId(){
+        String sessionId = '';
+        // Refer to the Page
+        PageReference reportPage = Page.GetSessionIdVF;
+        // Get the content of the VF page
+        String vfContent = reportPage.getContent().toString();
+        // Find the position of Start_Of_Session_Id and End_Of_Session_Id
+        Integer startP = vfContent.indexOf('Start_Of_Session_Id') + 'Start_Of_Session_Id'.length(),
+        endP = vfContent.indexOf('End_Of_Session_Id');
+        sessionId = vfContent.substring(startP, endP);
+        return sessionId;
+    }
+    
+    public class MetadataServiceExamplesException extends Exception { }
+}
